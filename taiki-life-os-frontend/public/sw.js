@@ -162,7 +162,10 @@ function markAsSynced(db, itemId) {
     
     request.onerror = () => reject(request.error);
   });
-}er('push', (event) => {
+}
+
+// Push通知イベント
+self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'New notification',
     icon: '/icons/AppIcon_1024_black.png',
