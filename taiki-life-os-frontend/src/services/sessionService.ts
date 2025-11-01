@@ -1,5 +1,5 @@
 import api, { DEFAULT_USER_ID } from './api';
-import { Session } from '../types';
+import type { Session } from '../types';
 
 export const sessionService = {
   // セッション開始

@@ -1,5 +1,5 @@
-import Dexie, { Table } from 'dexie';
-import { Task, Session, DailyReview } from '../types';
+import Dexie, { type Table } from 'dexie';
+import type { Task, Session, DailyReview } from '../types';
 
 // IndexedDBデータベースクラス
 export class TaikiLifeOSDB extends Dexie {
@@ -59,7 +59,7 @@ export async function processSyncQueue(): Promise<void> {
     return;
   }
 
-  const items = await db.syncQueue.where('synced').equals(false).toArray();
+  const items = await db.syncQueue.where('synced').equals(false as any).toArray();
   
   for (const item of items) {
     try {

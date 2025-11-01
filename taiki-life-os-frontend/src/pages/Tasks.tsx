@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { taskService } from '../services/taskService';
-import { Task, TaskStatus } from '../types';
+import type { Task, TaskStatus } from '../types';
 
 function Tasks() {
   const [inboxTasks, setInboxTasks] = useState<Task[]>([]);

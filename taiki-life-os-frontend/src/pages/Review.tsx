@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { reviewService } from '../services/reviewService';
-import { DailyReview } from '../types';
+import type { DailyReview } from '../types';
 
 function Review() {
   const navigate = useNavigate();

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { kpiService } from '../services/kpiService';
 import { sessionService } from '../services/sessionService';
-import { KPIDashboard, Session } from '../types';
+import type { KPIDashboard, Session } from '../types';
 import KPITrendChart from '../components/KPITrendChart';
 
 function Dashboard() {

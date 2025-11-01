@@ -1,5 +1,5 @@
 import api, { DEFAULT_USER_ID } from './api';
-import { KPIDashboard } from '../types';
+import type { KPIDashboard } from '../types';
 
 export const kpiService = {
   // KPIダッシュボード取得

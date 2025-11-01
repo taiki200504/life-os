@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionService } from '../services/sessionService';
-import { Session } from '../types';
+import type { Session } from '../types';
 
 function StopSession() {
   const navigate = useNavigate();

@@ -1,5 +1,5 @@
 import api, { DEFAULT_USER_ID } from './api';
-import { Task, TaskStatus } from '../types';
+import type { Task, TaskStatus } from '../types';
 
 export const taskService = {
   // タスク作成

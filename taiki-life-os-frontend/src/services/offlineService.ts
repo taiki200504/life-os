@@ -1,5 +1,5 @@
 import { db, isOnline, addToSyncQueue } from '../utils/db';
-import { Task, Session, DailyReview, TaskStatus } from '../types';
+import type { Task, Session, DailyReview, TaskStatus } from '../types';
 import { taskService } from './taskService';
 import { sessionService } from './sessionService';
 import { reviewService } from './reviewService';
@@ -25,11 +25,11 @@ export const offlineTaskService = {
     return await db.tasks.toArray();
   },
 
-  async createTask(data: Partial<Task>): Promise<Task> {
+  async createTask(data: { title: string; status?: TaskStatus; area?: string; impact?: number; effort?: number; deadline?: string; context?: string[] }): Promise<Task> {
     const task: Task = {
       id: `temp-${Date.now()}`,
       user_id: 'default-user',
-      title: data.title!,
+      title: data.title,
       status: data.status || 'inbox',
       area: data.area,
       impact: data.impact,
@@ -179,12 +179,12 @@ export const offlineSessionService = {
 
 // オフライン対応のレビューサービス
 export const offlineReviewService = {
-  async createOrUpdateReview(data: Partial<DailyReview>): Promise<DailyReview> {
+  async createOrUpdateReview(data: { date: string; deep_work_min: number; top3?: string[]; blockers?: string[]; learn?: string; stop_doing?: string; score?: number }): Promise<DailyReview> {
     const review: DailyReview = {
-      id: data.id || `temp-${Date.now()}`,
+      id: data.date || `temp-${Date.now()}`,
       user_id: 'default-user',
-      date: data.date!,
-      deep_work_min: data.deep_work_min!,
+      date: data.date,
+      deep_work_min: data.deep_work_min,
       top3: data.top3,
       blockers: data.blockers,
       learn: data.learn,

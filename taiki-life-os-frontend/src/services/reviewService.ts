@@ -1,5 +1,5 @@
 import api, { DEFAULT_USER_ID } from './api';
-import { DailyReview } from '../types';
+import type { DailyReview } from '../types';
 
 export const reviewService = {
   // 日次レビュー作成/更新
