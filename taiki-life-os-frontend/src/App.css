@@ -1,1 +1,7 @@
-Inherited file content will not be shown
+/* App-specific styles */
+
+.app-container {
+  min-height: 100vh;
+}
+
+/* Additional component styles can be added here */
