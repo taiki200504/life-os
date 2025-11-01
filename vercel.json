@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd taiki-life-os-frontend && npm install && npm run build",
+  "buildCommand": "cd taiki-life-os-frontend && npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "taiki-life-os-frontend/dist",
-  "installCommand": "cd taiki-life-os-frontend && npm install",
+  "installCommand": "cd taiki-life-os-frontend && npm install --legacy-peer-deps",
   "rewrites": [
     {
       "source": "/((?!sw\\.js|manifest\\.json|assets/|icons/).*)",
