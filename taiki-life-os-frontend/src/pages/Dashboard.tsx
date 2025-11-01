@@ -138,7 +138,7 @@ function Dashboard() {
       )}
 
       {/* KPIカード */}
-      {kpiData && (
+      {kpiData && kpiData.kpis && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">KPI Overview</h3>
@@ -155,51 +155,51 @@ function Dashboard() {
           
           <div className="grid grid-cols-2 gap-4">
             {/* ルーティン実行率 */}
-            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.routine_execution_rate.status)}`}>
+            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.routine_execution_rate?.status || 'warning')}`}>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium">Routine Rate</p>
-                <span className="text-lg">{getStatusIcon(kpiData.kpis.routine_execution_rate.status)}</span>
+                <span className="text-lg">{getStatusIcon(kpiData.kpis.routine_execution_rate?.status || 'warning')}</span>
               </div>
               <p className="text-3xl font-bold mt-1">
-                {kpiData.kpis.routine_execution_rate.value}%
+                {kpiData.kpis.routine_execution_rate?.value ?? 0}%
               </p>
-              <p className="text-xs mt-1 opacity-75">Target: {kpiData.kpis.routine_execution_rate.target}%</p>
+              <p className="text-xs mt-1 opacity-75">Target: {kpiData.kpis.routine_execution_rate?.target ?? 85}%</p>
             </div>
 
             {/* Deep Work */}
-            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.weekly_deep_work.status)}`}>
+            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.weekly_deep_work?.status || 'warning')}`}>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium">Deep Work</p>
-                <span className="text-lg">{getStatusIcon(kpiData.kpis.weekly_deep_work.status)}</span>
+                <span className="text-lg">{getStatusIcon(kpiData.kpis.weekly_deep_work?.status || 'warning')}</span>
               </div>
               <p className="text-3xl font-bold mt-1">
-                {Math.floor(kpiData.kpis.weekly_deep_work.value / 60)}h
+                {Math.floor((kpiData.kpis.weekly_deep_work?.value ?? 0) / 60)}h
               </p>
               <p className="text-xs mt-1 opacity-75">
-                {kpiData.kpis.weekly_deep_work.value}分 / 週
+                {kpiData.kpis.weekly_deep_work?.value ?? 0}分 / 週
               </p>
             </div>
 
             {/* INBOX滞留 */}
-            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.inbox_overdue.status)}`}>
+            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.inbox_overdue?.status || 'warning')}`}>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium">Inbox Overdue</p>
-                <span className="text-lg">{getStatusIcon(kpiData.kpis.inbox_overdue.status)}</span>
+                <span className="text-lg">{getStatusIcon(kpiData.kpis.inbox_overdue?.status || 'warning')}</span>
               </div>
               <p className="text-3xl font-bold mt-1">
-                {kpiData.kpis.inbox_overdue.value}
+                {kpiData.kpis.inbox_overdue?.value ?? 0}
               </p>
               <p className="text-xs mt-1 opacity-75">24h+ tasks</p>
             </div>
 
             {/* レビュー提出率 */}
-            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.review_submission_rate.status)}`}>
+            <div className={`rounded-lg border p-4 ${getStatusColor(kpiData.kpis.review_submission_rate?.status || 'warning')}`}>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium">Review Rate</p>
-                <span className="text-lg">{getStatusIcon(kpiData.kpis.review_submission_rate.status)}</span>
+                <span className="text-lg">{getStatusIcon(kpiData.kpis.review_submission_rate?.status || 'warning')}</span>
               </div>
               <p className="text-3xl font-bold mt-1">
-                {kpiData.kpis.review_submission_rate.value}%
+                {kpiData.kpis.review_submission_rate?.value ?? 0}%
               </p>
               <p className="text-xs mt-1 opacity-75">This week</p>
             </div>
@@ -233,7 +233,7 @@ function Dashboard() {
       )}
 
       {/* タスク統計 */}
-      {kpiData && (
+      {kpiData && kpiData.task_stats && (
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Tasks</h3>
@@ -246,15 +246,15 @@ function Dashboard() {
           </div>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-4xl font-bold text-gray-900">{kpiData.task_stats.inbox}</p>
+              <p className="text-4xl font-bold text-gray-900">{kpiData.task_stats.inbox ?? 0}</p>
               <p className="text-sm text-gray-600 mt-1">Inbox</p>
             </div>
             <div>
-              <p className="text-4xl font-bold text-black">{kpiData.task_stats.today}</p>
+              <p className="text-4xl font-bold text-black">{kpiData.task_stats.today ?? 0}</p>
               <p className="text-sm text-gray-600 mt-1">Today</p>
             </div>
             <div>
-              <p className="text-4xl font-bold text-green-600">{kpiData.task_stats.done}</p>
+              <p className="text-4xl font-bold text-green-600">{kpiData.task_stats.done ?? 0}</p>
               <p className="text-sm text-gray-600 mt-1">Done</p>
             </div>
           </div>
@@ -262,7 +262,7 @@ function Dashboard() {
       )}
 
       {/* 今日のセッション */}
-      {kpiData && kpiData.today_sessions.total_sessions > 0 && (
+      {kpiData && kpiData.today_sessions && kpiData.today_sessions.total_sessions > 0 && (
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Today's Sessions</h3>
           <div className="grid grid-cols-2 gap-4 mb-4">

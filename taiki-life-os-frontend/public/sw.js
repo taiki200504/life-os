@@ -37,6 +37,12 @@ self.addEventListener('activate', (event) => {
 
 // フェッチイベント（stale-while-revalidate戦略）
 self.addEventListener('fetch', (event) => {
+  // HTTP/HTTPSリクエストのみを処理（chrome-extensionなどは除外）
+  const url = new URL(event.request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return; // スキップ
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
@@ -45,11 +51,15 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         }
         
-        // 成功したレスポンスをキャッシュに保存
-        if (networkResponse && networkResponse.status === 200) {
+        // 成功したHTTP/HTTPSレスポンスのみをキャッシュに保存
+        if (networkResponse && networkResponse.status === 200 && 
+            (url.protocol === 'http:' || url.protocol === 'https:')) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
+            cache.put(event.request, responseToCache).catch((err) => {
+              // キャッシュエラーは無視（chrome-extensionなど）
+              console.warn('Cache put failed:', err);
+            });
           });
         }
         return networkResponse;
