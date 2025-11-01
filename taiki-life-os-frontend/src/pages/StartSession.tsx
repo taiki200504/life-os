@@ -10,7 +10,6 @@ function StartSession() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // プリセットプロジェクト
   const presetProjects = [
     'Deep Work',
     'EGG',
@@ -21,7 +20,6 @@ function StartSession() {
     'Exercise',
   ];
 
-  // プリセット時間
   const presetDurations = [
     { label: '25分', value: 25 },
     { label: '45分', value: 45 },
@@ -29,7 +27,6 @@ function StartSession() {
     { label: '120分', value: 120 },
   ];
 
-  // コンテキストタグ
   const contextTags = [
     'Focus',
     'Creative',
@@ -64,7 +61,6 @@ function StartSession() {
         context,
       });
 
-      // ダッシュボードに戻る
       navigate('/');
     } catch (err) {
       console.error('Failed to start session:', err);
@@ -75,112 +71,125 @@ function StartSession() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-20">
-      <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Start Session</h1>
-          <p className="text-gray-600">新しい作業セッションを開始します</p>
+    <div className="max-w-3xl mx-auto pb-24 px-4">
+      <div className="card space-y-8">
+        {/* ヘッダー */}
+        <div className="border-b border-gray-200 pb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Start Session</h1>
+          <p className="text-gray-600 font-medium">新しい作業セッションを開始します</p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600 text-sm">{error}</p>
+          <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+            <p className="text-red-800 font-medium">{error}</p>
           </div>
         )}
 
-        {/* プロジェクト選択 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            プロジェクト名 *
-          </label>
-          <input
-            type="text"
-            value={project}
-            onChange={(e) => setProject(e.target.value)}
-            placeholder="プロジェクト名を入力"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {presetProjects.map((preset) => (
-              <button
-                key={preset}
-                onClick={() => setProject(preset)}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-full hover:bg-gray-50 transition"
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 時間設定 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            予定時間
-          </label>
-          <div className="grid grid-cols-4 gap-3">
-            {presetDurations.map((preset) => (
-              <button
-                key={preset.value}
-                onClick={() => setDuration(preset.value)}
-                className={`py-3 rounded-lg font-medium transition ${
-                  duration === preset.value
-                    ? 'bg-black text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3">
+        <div className="space-y-8">
+          {/* プロジェクト選択 */}
+          <div>
+            <label htmlFor="project-name" className="label">
+              プロジェクト名 <span className="text-red-500">*</span>
+            </label>
             <input
-              type="range"
-              min="15"
-              max="180"
-              step="15"
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-              className="w-full"
+              id="project-name"
+              name="project-name"
+              type="text"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+              placeholder="プロジェクト名を入力"
+              autoComplete="off"
+              className="input-field text-lg"
             />
-            <p className="text-center text-sm text-gray-600 mt-1">
-              {duration}分
-            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {presetProjects.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setProject(preset)}
+                  className="px-4 py-2 text-sm border-2 border-gray-300 rounded-full hover:border-black hover:bg-black hover:text-white transition-all duration-200 font-medium"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 時間設定 */}
+          <div>
+            <label className="label">
+              予定時間
+            </label>
+            <div className="grid grid-cols-4 gap-4 mb-4">
+              {presetDurations.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => setDuration(preset.value)}
+                  className={`py-4 rounded-xl font-semibold transition-all duration-200 ${
+                    duration === preset.value
+                      ? 'bg-black text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <input
+                id="duration-slider"
+                name="duration"
+                type="range"
+                min="15"
+                max="180"
+                step="15"
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black"
+              />
+              <p className="text-center text-lg font-bold text-gray-900">
+                {duration}分
+              </p>
+            </div>
+          </div>
+
+          {/* コンテキストタグ */}
+          <div>
+            <label className="label">
+              コンテキスト（任意）
+            </label>
+            <div className="flex flex-wrap gap-3">
+              {contextTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => handleContextToggle(tag)}
+                  className={`px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    context.includes(tag)
+                      ? 'bg-black text-white shadow-md scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            {context.length > 0 && (
+              <p className="mt-3 text-sm text-gray-600">
+                選択中: {context.join(', ')}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* コンテキストタグ */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            コンテキスト（任意）
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {contextTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => handleContextToggle(tag)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                  context.includes(tag)
-                    ? 'bg-black text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 開始ボタン */}
-        <div className="pt-4">
+        {/* アクションボタン */}
+        <div className="pt-6 border-t border-gray-200 space-y-3">
           <button
+            type="button"
             onClick={handleStart}
             disabled={loading || !project.trim()}
-            className={`w-full py-4 rounded-lg font-semibold text-lg transition ${
-              loading || !project.trim()
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-black text-white hover:bg-gray-800'
-            }`}
+            className="btn-primary w-full py-4 text-lg"
           >
             {loading ? (
               <span className="flex items-center justify-center">
@@ -210,25 +219,14 @@ function StartSession() {
               'セッション開始'
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="w-full py-3 text-gray-600 hover:text-gray-900 font-medium transition"
+          >
+            キャンセル
+          </button>
         </div>
-
-        {/* キャンセルボタン */}
-        <button
-          onClick={() => navigate('/')}
-          className="w-full py-3 text-gray-600 hover:text-gray-900 transition"
-        >
-          キャンセル
-        </button>
-      </div>
-
-      {/* ヒント */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 mb-2">💡 ヒント</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• デフォルトは90分のDeep Workブロックです</li>
-          <li>• セッション中は通知をオフにすることをおすすめします</li>
-          <li>• 一点集中で最重要タスクに取り組みましょう</li>
-        </ul>
       </div>
     </div>
   );

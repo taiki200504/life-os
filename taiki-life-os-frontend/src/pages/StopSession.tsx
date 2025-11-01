@@ -43,8 +43,6 @@ function StopSession() {
 
     try {
       await sessionService.stopSession(session.id, notes);
-      
-      // ダッシュボードに戻る
       navigate('/');
     } catch (err) {
       console.error('Failed to stop session:', err);
@@ -75,8 +73,8 @@ function StopSession() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">読み込み中...</p>
         </div>
       </div>
     );
@@ -84,74 +82,78 @@ function StopSession() {
 
   if (error && !session) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600">{error}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-4 px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition"
-          >
-            ダッシュボードに戻る
-          </button>
+      <div className="max-w-3xl mx-auto px-4">
+        <div className="card text-center">
+          <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-6">
+            <p className="text-red-800 font-semibold text-lg mb-4">{error}</p>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="btn-primary"
+            >
+              ダッシュボードに戻る
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-20">
-      <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Stop Session</h1>
-          <p className="text-gray-600">セッションを終了します</p>
+    <div className="max-w-3xl mx-auto pb-24 px-4">
+      <div className="card space-y-8">
+        {/* ヘッダー */}
+        <div className="border-b border-gray-200 pb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Stop Session</h1>
+          <p className="text-gray-600 font-medium">セッションを終了します</p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600 text-sm">{error}</p>
+          <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+            <p className="text-red-800 font-medium">{error}</p>
           </div>
         )}
 
         {session && (
           <>
-            {/* セッション情報 */}
-            <div className="bg-black text-white rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">{session.project}</h2>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-white text-black">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+            {/* セッション情報カード */}
+            <div className="bg-gradient-to-br from-gray-900 to-black text-white rounded-2xl p-8 shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">{session.project}</h2>
+                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-white text-black">
+                  <span className="w-2.5 h-2.5 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                   Running
                 </span>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-300">開始時刻</span>
-                  <span className="font-medium">
+              <div className="space-y-4 border-t border-gray-700 pt-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300 font-medium">開始時刻</span>
+                  <span className="font-bold text-lg">
                     {new Date(session.start_at).toLocaleTimeString('ja-JP', {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">予定時間</span>
-                  <span className="font-medium">{session.planned_min}分</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300 font-medium">予定時間</span>
+                  <span className="font-bold text-lg">{session.planned_min}分</span>
                 </div>
-                <div className="flex justify-between border-t border-gray-700 pt-2 mt-2">
-                  <span className="text-gray-300">経過時間</span>
-                  <span className="font-bold text-lg">{getElapsedTime()}</span>
+                <div className="flex justify-between items-center pt-4 border-t border-gray-700">
+                  <span className="text-gray-300 font-semibold">経過時間</span>
+                  <span className="font-black text-3xl text-white">{getElapsedTime()}</span>
                 </div>
               </div>
 
               {session.context && session.context.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-700">
-                  <p className="text-xs text-gray-400 mb-2">コンテキスト</p>
+                <div className="mt-6 pt-6 border-t border-gray-700">
+                  <p className="text-xs text-gray-400 font-semibold mb-3 uppercase tracking-wide">コンテキスト</p>
                   <div className="flex flex-wrap gap-2">
                     {session.context.map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 bg-gray-700 text-white text-xs rounded-full"
+                        className="px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-full"
                       >
                         {tag}
                       </span>
@@ -163,31 +165,31 @@ function StopSession() {
 
             {/* ノート入力 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="session-notes" className="label">
                 ノート（任意）
               </label>
               <textarea
+                id="session-notes"
+                name="session-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="セッションの振り返りや気づきを記録..."
                 rows={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent resize-none"
+                autoComplete="off"
+                className="input-field resize-none"
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-sm text-gray-500 mt-2">
                 何を達成したか、どんな学びがあったかを記録しましょう
               </p>
             </div>
 
-            {/* 終了ボタン */}
-            <div className="pt-4">
+            {/* アクションボタン */}
+            <div className="pt-6 border-t border-gray-200 space-y-3">
               <button
+                type="button"
                 onClick={handleStop}
                 disabled={stopping}
-                className={`w-full py-4 rounded-lg font-semibold text-lg transition ${
-                  stopping
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-black text-white hover:bg-gray-800'
-                }`}
+                className="btn-primary w-full py-4 text-lg"
               >
                 {stopping ? (
                   <span className="flex items-center justify-center">
@@ -217,25 +219,16 @@ function StopSession() {
                   'セッション終了'
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="w-full py-3 text-gray-600 hover:text-gray-900 font-medium transition"
+              >
+                キャンセル
+              </button>
             </div>
-
-            {/* キャンセルボタン */}
-            <button
-              onClick={() => navigate('/')}
-              className="w-full py-3 text-gray-600 hover:text-gray-900 transition"
-            >
-              キャンセル
-            </button>
           </>
         )}
-      </div>
-
-      {/* ヒント */}
-      <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-        <h3 className="font-semibold text-green-900 mb-2">✅ お疲れ様でした！</h3>
-        <p className="text-sm text-green-800">
-          セッション終了後は、必ず日次レビューで振り返りを行いましょう。
-        </p>
       </div>
     </div>
   );
