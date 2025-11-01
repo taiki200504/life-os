@@ -1,8 +1,11 @@
 {
   "version": 2,
+  "buildCommand": "cd taiki-life-os-frontend && npm install && npm run build",
+  "outputDirectory": "taiki-life-os-frontend/dist",
+  "installCommand": "cd taiki-life-os-frontend && npm install",
   "builds": [
     {
-      "src": "package.json",
+      "src": "taiki-life-os-frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist"
