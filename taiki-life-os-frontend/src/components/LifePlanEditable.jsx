@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { BookOpen, Heart, Building, Target, User, MapPin, Clock, Trophy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Heart, Building, Target, User, MapPin, Clock, Trophy, RefreshCw } from 'lucide-react';
 import { EditableText, EditableList, EditableSection } from './EditableContent';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { Button } from '@/components/ui/button.jsx';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const LifePlanEditable = () => {
   const [lifePlanData, setLifePlanData] = useLocalStorage('lifePlanData', {
@@ -75,6 +78,8 @@ const LifePlanEditable = () => {
         [key]: value
       }
     }));
+    // Notionに即座に同期
+    syncToNotion();
   };
 
   const updateSimpleData = (key, value) => {
@@ -82,7 +87,53 @@ const LifePlanEditable = () => {
       ...prev,
       [key]: value
     }));
+    // Notionに即座に同期
+    syncToNotion();
   };
+
+  // Notionから人生計画を取得
+  useEffect(() => {
+    fetchLifePlanFromNotion()
+    // 5分ごとに自動同期
+    const syncInterval = setInterval(() => {
+      syncToNotion()
+    }, 5 * 60 * 1000)
+    
+    return () => clearInterval(syncInterval)
+  }, [])
+
+  const fetchLifePlanFromNotion = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/notion/life-plan`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.life_plan) {
+          // NotionのデータをlifePlanData形式に変換
+          // 実際のデータ構造に合わせて調整が必要
+          // setLifePlanData(parsedData)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch life plan from Notion:', error)
+    }
+  }
+
+  const syncToNotion = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/notion/life-plan/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ life_plan: lifePlanData }),
+      })
+      if (response.ok) {
+        console.log('Life plan synced to Notion')
+      }
+    } catch (error) {
+      console.error('Failed to sync life plan to Notion:', error)
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -93,10 +144,19 @@ const LifePlanEditable = () => {
             <BookOpen className="w-8 h-8 text-red-600" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">
-            人生計画（編集可能）
+            人生計画（編集可能・Notion同期）
           </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={syncToNotion}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            同期
+          </Button>
         </div>
-        <p className="text-gray-600">理念、目標、そして未来への道筋を明確にする</p>
+        <p className="text-gray-600">理念、目標、そして未来への道筋を明確にする。Notionの人生計画データベースと同期しています。</p>
       </div>
 
       {/* 自己理念 */}

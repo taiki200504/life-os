@@ -5,7 +5,6 @@ import Dashboard from './components/Dashboard.jsx'
 import LifeOS from './components/LifeOS.jsx'
 import LifePlan from './components/LifePlan.jsx'
 import LifePlanEditable from './components/LifePlanEditable.jsx'
-import CurrentSelf from './components/CurrentSelf.jsx'
 import Settings from './components/Settings.jsx'
 import { useLocalStorage } from './hooks/useLocalStorage.js'
 import './App.css'
@@ -46,8 +45,6 @@ function App() {
         return <LifeOS />
       case 'life-plan':
         return editMode ? <LifePlanEditable /> : <LifePlan />
-      case 'current-self':
-        return <CurrentSelf />
       case 'settings':
         return <Settings />
       default:

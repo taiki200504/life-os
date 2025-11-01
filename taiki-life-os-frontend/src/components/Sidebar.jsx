@@ -21,12 +21,6 @@ const sidebarItems = [
     active: false
   },
   {
-    id: 'current-self',
-    label: '現在の自分',
-    icon: User,
-    active: false
-  },
-  {
     id: 'settings',
     label: '設定',
     icon: Settings,

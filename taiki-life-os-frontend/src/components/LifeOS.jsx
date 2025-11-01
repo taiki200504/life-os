@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronRight, Target, Clock, Shield, Smartphone, Home, Heart, AlertTriangle, BarChart3 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Target, Clock, Shield, Smartphone, Home, Heart, AlertTriangle, BarChart3, RefreshCw, Edit3 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 
-const lifeOSData = [
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
+
+const defaultLifeOSData = [
   {
     id: 'principles',
     title: '1) 原則（コア思想）',
@@ -130,25 +132,98 @@ const lifeOSData = [
       '3行ログ（事実/解釈/次の最小行動）',
       '最小行動1つ（静寂3分 or 学習3分 or 片付け3分）'
     ]
-  },
-  {
-    id: 'metrics',
-    title: '11) 軽量メトリクス（毎晩○×でOK）',
-    icon: BarChart3,
-    color: 'text-teal-600',
-    items: [
-      '深い仕事1ブロック',
-      '運動（10分以上）',
-      '学習（15分以上）',
-      'SNS合計45分以内',
-      '感謝1回',
-      '→ 週20/35以上＝良い週。下回ったら"環境を1つ変える"だけやる。'
-    ]
   }
 ]
 
 export default function LifeOS() {
+  const [lifeOSData, setLifeOSData] = useState(defaultLifeOSData)
   const [expandedSections, setExpandedSections] = useState({})
+  const [editMode, setEditMode] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState(null)
+  
+  // NotionからLIFEルールを取得
+  useEffect(() => {
+    fetchLifeRules()
+    // 5分ごとに自動同期
+    const syncInterval = setInterval(() => {
+      syncWithNotion()
+    }, 5 * 60 * 1000)
+    
+    return () => clearInterval(syncInterval)
+  }, [])
+  
+  const fetchLifeRules = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/notion/life-rules`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.rules && data.rules.length > 0) {
+          // NotionのルールをパースしてlifeOSData形式に変換
+          const parsedRules = parseNotionRules(data.rules)
+          if (parsedRules.length > 0) {
+            setLifeOSData(parsedRules)
+            setLastSync(new Date())
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch LIFE rules from Notion:', error)
+    }
+  }
+  
+  const parseNotionRules = (notionRules) => {
+    // NotionのルールデータをlifeOSData形式に変換
+    // 実際のNotionデータ構造に合わせて調整が必要
+    return defaultLifeOSData // 暫定
+  }
+  
+  const syncWithNotion = async () => {
+    setSyncing(true)
+    try {
+      // Notionに送信
+      const response = await fetch(`${API_BASE}/notion/life-rules/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          rules: lifeOSData.map(section => ({
+            notion_id: section.notion_id,
+            title: section.title,
+            items: section.items
+          }))
+        }),
+      })
+      
+      if (response.ok) {
+        // 取得も実行
+        await fetchLifeRules()
+        setLastSync(new Date())
+      }
+    } catch (error) {
+      console.error('Sync failed:', error)
+    } finally {
+      setSyncing(false)
+    }
+  }
+  
+  const updateRule = (sectionId, itemIndex, newValue) => {
+    setLifeOSData(prevData =>
+      prevData.map(section =>
+        section.id === sectionId
+          ? {
+              ...section,
+              items: section.items.map((item, idx) =>
+                idx === itemIndex ? newValue : item
+              )
+            }
+          : section
+      )
+    )
+    // Notionに即座に同期
+    syncWithNotion()
+  }
   
   const toggleSection = (sectionId) => {
     setExpandedSections(prev => ({
@@ -161,12 +236,38 @@ export default function LifeOS() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          🎯 Taiki Life OS — Noise-Free Edition (V1)
-        </h1>
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <h1 className="text-3xl font-bold text-gray-900">
+            🎯 Taiki Life OS — Noise-Free Edition (V1)
+          </h1>
+          <Button
+            variant={editMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setEditMode(!editMode)}
+            className="flex items-center gap-2"
+          >
+            <Edit3 className="w-4 h-4" />
+            {editMode ? '編集モード' : '表示モード'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={syncWithNotion}
+            disabled={syncing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? '同期中...' : '同期'}
+          </Button>
+        </div>
         <p className="text-gray-600">
-          シンプルに攻めて、ノイズを斬る。必要ならこのV1を「チェックリスト版」「iPhoneショートカット実装手順版」に落とし込む。
+          シンプルに攻めて、ノイズを斬る。NotionのLIFEルールデータベースと同期しています。
         </p>
+        {lastSync && (
+          <p className="text-xs text-gray-500 mt-2">
+            最終同期: {lastSync.toLocaleString('ja-JP')}
+          </p>
+        )}
       </div>
       
       {/* Life OS Rules */}
@@ -200,7 +301,16 @@ export default function LifeOS() {
                     {section.items.map((item, index) => (
                       <div key={index} className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-2 h-2 bg-gray-300 rounded-full mt-2"></div>
-                        <p className="text-gray-700 leading-relaxed">{item}</p>
+                        {editMode ? (
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) => updateRule(section.id, index, e.target.value)}
+                            className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-black"
+                          />
+                        ) : (
+                          <p className="text-gray-700 leading-relaxed">{item}</p>
+                        )}
                       </div>
                     ))}
                     {section.note && (
@@ -217,20 +327,6 @@ export default function LifeOS() {
           )
         })}
       </div>
-      
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-3 justify-center pt-6">
-        <Button variant="outline">
-          チェックリスト版を作成
-        </Button>
-        <Button variant="outline">
-          iPhoneショートカット版
-        </Button>
-        <Button variant="outline">
-          印刷用表示
-        </Button>
-      </div>
     </div>
   )
 }
-

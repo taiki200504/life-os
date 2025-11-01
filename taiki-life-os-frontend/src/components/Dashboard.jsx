@@ -8,19 +8,16 @@ import {
   Edit3, 
   Plus, 
   X,
-  Clock,
   Zap,
   Heart,
   Brain,
   Dumbbell,
   BookOpen,
-  MessageCircle,
   RotateCcw,
   ChevronRight,
-  Star,
-  Award,
   Sun,
-  Moon
+  Moon,
+  RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
@@ -43,14 +40,6 @@ const defaultWeeklyTasks = [
   { id: 5, text: '次週の最重要決定', current: 0, target: 1, unit: '回', color: 'orange' }
 ]
 
-const defaultMetrics = [
-  { id: 1, text: '深い仕事1ブロック', days: [false, false, false, false, false, false, false] },
-  { id: 2, text: '運動(10分以上)', days: [false, false, false, false, false, false, false] },
-  { id: 3, text: '学習(15分以上)', days: [false, false, false, false, false, false, false] },
-  { id: 4, text: 'SNS45分以内', days: [false, false, false, false, false, false, false] },
-  { id: 5, text: '感謝1回', days: [false, false, false, false, false, false, false] }
-]
-
 const iconMap = {
   Brain,
   Zap,
@@ -60,14 +49,17 @@ const iconMap = {
   RotateCcw
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
+
 export default function Dashboard() {
   const [tasks, setTasks] = useLocalStorage('dailyTasks', defaultDailyTasks)
   const [weeklyTasks, setWeeklyTasks] = useLocalStorage('weeklyTasks', defaultWeeklyTasks)
-  const [metrics, setMetrics] = useLocalStorage('metrics', defaultMetrics)
   const [isEditing, setIsEditing] = useState(false)
   const [newTaskText, setNewTaskText] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isRetractedMode, setIsRetractedMode] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState(null)
   
   // 時刻を更新
   useEffect(() => {
@@ -75,19 +67,148 @@ export default function Dashboard() {
     return () => clearInterval(timer)
   }, [])
   
-  // デバッグ用: タスクの状態をコンソールに出力
+  // 5分ごとの自動同期
   useEffect(() => {
-    console.log('Current tasks:', tasks)
-    console.log('Completed tasks count:', tasks.filter(task => task.completed).length)
-  }, [tasks])
+    const syncInterval = setInterval(() => {
+      syncWithNotion()
+    }, 5 * 60 * 1000) // 5分 = 300000ms
+    
+    // 初回読み込み時も同期
+    syncWithNotion()
+    
+    return () => clearInterval(syncInterval)
+  }, [tasks, weeklyTasks])
   
-  const toggleTask = (taskId) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ))
+  // Notionからタスクを取得
+  const fetchTasksFromNotion = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/notion/taiki-tasks`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.tasks && data.tasks.length > 0) {
+          // Notionのタスクをローカルに反映
+          const notionTasks = data.tasks.map(task => ({
+            id: task.id || Date.now() + Math.random(),
+            text: task.name || task.title,
+            completed: task.completed || false,
+            icon: getIconFromCategory(task.category),
+            color: 'gray',
+            notionId: task.notion_id
+          }))
+          setTasks(notionTasks)
+          setLastSync(new Date())
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch tasks from Notion:', error)
+    }
   }
   
-  const addTask = () => {
+  // Notionから週次目標を取得
+  const fetchWeeklyGoalsFromNotion = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/notion/weekly-goals`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.goals && data.goals.length > 0) {
+          const notionGoals = data.goals.map(goal => ({
+            id: goal.id || Date.now() + Math.random(),
+            text: goal.name,
+            current: goal.current || 0,
+            target: goal.target || 0,
+            unit: goal.unit || '回',
+            color: 'green',
+            notionId: goal.notion_id
+          }))
+          setWeeklyTasks(notionGoals)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch weekly goals from Notion:', error)
+    }
+  }
+  
+  // Notionにタスクを同期
+  const syncTasksToNotion = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/notion/taiki-tasks/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tasks }),
+      })
+      if (response.ok) {
+        setLastSync(new Date())
+      }
+    } catch (error) {
+      console.error('Failed to sync tasks to Notion:', error)
+    }
+  }
+  
+  // Notionに週次目標を同期
+  const syncWeeklyGoalsToNotion = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/notion/weekly-goals/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ goals: weeklyTasks }),
+      })
+      if (response.ok) {
+        setLastSync(new Date())
+      }
+    } catch (error) {
+      console.error('Failed to sync weekly goals to Notion:', error)
+    }
+  }
+  
+  // 双方向同期
+  const syncWithNotion = async () => {
+    setSyncing(true)
+    try {
+      // Notionから取得
+      await Promise.all([
+        fetchTasksFromNotion(),
+        fetchWeeklyGoalsFromNotion()
+      ])
+      
+      // Notionに送信（ローカル変更があれば）
+      await Promise.all([
+        syncTasksToNotion(),
+        syncWeeklyGoalsToNotion()
+      ])
+    } catch (error) {
+      console.error('Sync failed:', error)
+    } finally {
+      setSyncing(false)
+    }
+  }
+  
+  // カテゴリからアイコンを取得
+  const getIconFromCategory = (category) => {
+    const categoryMap = {
+      '静寂': 'Brain',
+      '深い仕事': 'Zap',
+      '運動': 'Dumbbell',
+      '学習': 'BookOpen',
+      '感謝': 'Heart',
+      'リセット': 'RotateCcw'
+    }
+    return categoryMap[category] || 'Circle'
+  }
+  
+  const toggleTask = async (taskId) => {
+    const updatedTasks = tasks.map(task => 
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    )
+    setTasks(updatedTasks)
+    // Notionに即座に同期
+    await syncTasksToNotion()
+  }
+  
+  const addTask = async () => {
     if (newTaskText.trim()) {
       const newTask = {
         id: Date.now(),
@@ -98,30 +219,33 @@ export default function Dashboard() {
       }
       setTasks([...tasks, newTask])
       setNewTaskText('')
+      // Notionに同期
+      await syncTasksToNotion()
     }
   }
   
-  const removeTask = (taskId) => {
+  const removeTask = async (taskId) => {
+    const taskToRemove = tasks.find(t => t.id === taskId)
     setTasks(tasks.filter(task => task.id !== taskId))
+    // Notionからも削除（notionIdがある場合）
+    if (taskToRemove?.notionId) {
+      try {
+        await fetch(`${API_BASE}/notion/taiki-tasks/${taskToRemove.notionId}`, {
+          method: 'DELETE'
+        })
+      } catch (error) {
+        console.error('Failed to delete task from Notion:', error)
+      }
+    }
   }
   
-  const updateWeeklyTask = (taskId, field, value) => {
-    setWeeklyTasks(weeklyTasks.map(task =>
+  const updateWeeklyTask = async (taskId, field, value) => {
+    const updatedWeeklyTasks = weeklyTasks.map(task =>
       task.id === taskId ? { ...task, [field]: Math.max(0, value) } : task
-    ))
-  }
-  
-  const toggleMetricDay = (metricId, dayIndex) => {
-    setMetrics(metrics.map(metric =>
-      metric.id === metricId 
-        ? {
-            ...metric,
-            days: metric.days.map((day, index) =>
-              index === dayIndex ? !day : day
-            )
-          }
-        : metric
-    ))
+    )
+    setWeeklyTasks(updatedWeeklyTasks)
+    // Notionに同期
+    await syncWeeklyGoalsToNotion()
   }
   
   const resetToMinimalMode = () => {
@@ -139,7 +263,7 @@ export default function Dashboard() {
     setIsRetractedMode(false)
   }
   
-  // タスク完了数の計算を確実に行う
+  // タスク完了数の計算
   const completedTasks = tasks.filter(task => task.completed === true).length
   const totalTasks = tasks.length
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
@@ -148,80 +272,6 @@ export default function Dashboard() {
     const taskProgress = task.target > 0 ? task.current / task.target : 0
     return acc + taskProgress
   }, 0) / weeklyTasks.length * 100
-  
-  // クイックアクション関数
-  const handleTimerStart = () => {
-    const duration = prompt('タイマーの時間を分で入力してください（例: 25）', '25')
-    if (duration && !isNaN(duration)) {
-      const minutes = parseInt(duration)
-      alert(`${minutes}分のタイマーを開始しました！\n\n集中して作業に取り組みましょう。`)
-      
-      // 実際のタイマー機能（簡易版）
-      setTimeout(() => {
-        if (confirm('タイマーが終了しました！\n\n作業は完了しましたか？')) {
-          // 深い仕事タスクを自動で完了にする
-          const deepWorkTask = tasks.find(task => task.text.includes('深い仕事'))
-          if (deepWorkTask && !deepWorkTask.completed) {
-            toggleTask(deepWorkTask.id)
-          }
-        }
-      }, minutes * 60 * 1000)
-    }
-  }
-  
-  const handleGratitudeMessage = () => {
-    const message = prompt('今日感謝したいことを入力してください：')
-    if (message && message.trim()) {
-      alert(`感謝メッセージを記録しました：\n\n"${message.trim()}"\n\n素晴らしい気持ちですね！`)
-      
-      // 感謝タスクを自動で完了にする
-      const gratitudeTask = tasks.find(task => task.text.includes('感謝'))
-      if (gratitudeTask && !gratitudeTask.completed) {
-        toggleTask(gratitudeTask.id)
-      }
-    }
-  }
-  
-  const handleLearningRecord = () => {
-    const options = ['英語学習', 'プログラミング', '読書', 'その他']
-    const choice = prompt(`学習内容を選択してください：\n\n1. ${options[0]}\n2. ${options[1]}\n3. ${options[2]}\n4. ${options[3]}\n\n番号を入力してください（1-4）：`)
-    
-    if (choice && choice >= '1' && choice <= '4') {
-      const selectedOption = options[parseInt(choice) - 1]
-      const duration = prompt(`${selectedOption}の学習時間を分で入力してください：`, '15')
-      
-      if (duration && !isNaN(duration)) {
-        alert(`${selectedOption}を${duration}分学習しました！\n\n継続は力なり。素晴らしいです！`)
-        
-        // 学習タスクを自動で完了にする
-        const learningTask = tasks.find(task => task.text.includes('学習'))
-        if (learningTask && !learningTask.completed) {
-          toggleTask(learningTask.id)
-        }
-      }
-    }
-  }
-  
-  const handleReset = () => {
-    if (confirm('5分リセットを開始しますか？\n\n机と床を「見えてスッキリ」状態にしましょう！')) {
-      alert('5分リセット開始！\n\n1. 机の上を整理\n2. 床の物を片付け\n3. ゴミを捨てる\n4. 必要な物だけ残す\n\n頑張って！')
-      
-      // 5分後にリマインダー
-      setTimeout(() => {
-        if (confirm('5分経過しました！\n\nリセットは完了しましたか？')) {
-          // リセットタスクを自動で完了にする
-          const resetTask = tasks.find(task => task.text.includes('リセット'))
-          if (resetTask && !resetTask.completed) {
-            toggleTask(resetTask.id)
-          }
-        }
-      }, 5 * 60 * 1000)
-    }
-  }
-  
-  const metricsScore = metrics.reduce((acc, metric) => {
-    return acc + metric.days.filter(day => day).length
-  }, 0)
   
   // 時間帯による挨拶
   const getGreeting = () => {
@@ -264,11 +314,26 @@ export default function Dashboard() {
             </div>
             <div className="text-sm text-gray-500">現在時刻</div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={syncWithNotion}
+            disabled={syncing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? '同期中...' : '手動同期'}
+          </Button>
+          {lastSync && (
+            <div className="text-xs text-gray-500">
+              最終同期: {lastSync.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
         </div>
       </div>
 
       {/* 今日の進捗サマリー */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between">
             <div>
@@ -306,24 +371,6 @@ export default function Dashboard() {
             />
           </div>
         </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-purple-900">今週のスコア</h3>
-              <p className="text-3xl font-bold text-purple-700 mt-2">{metricsScore}/35</p>
-              <p className="text-purple-600 text-sm">軽量メトリクス</p>
-            </div>
-            <div className="p-3 bg-purple-200 rounded-lg">
-              <Award className="w-8 h-8 text-purple-700" />
-            </div>
-          </div>
-          <div className="flex items-center mt-4 gap-1">
-            {[...Array(Math.min(7, Math.floor(metricsScore / 5)))].map((_, i) => (
-              <Star key={i} className="w-4 h-4 text-purple-600 fill-current" />
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -335,7 +382,7 @@ export default function Dashboard() {
                 <Calendar className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">今日の目標</h2>
+                <h2 className="text-xl font-bold text-gray-900">今日の目標（Taiki Task）</h2>
                 <p className="text-gray-600 text-sm">
                   {isRetractedMode ? '縮退モード - 最小限のタスク' : 'Life OS - 毎日のやるべきこと'}
                 </p>
@@ -457,7 +504,7 @@ export default function Dashboard() {
               <TrendingUp className="w-6 h-6 text-purple-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">今週の目標</h2>
+              <h2 className="text-xl font-bold text-gray-900">今週の目標（Weekly Goals）</h2>
               <p className="text-gray-600 text-sm">週のやるべきこと</p>
             </div>
           </div>
@@ -507,99 +554,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      {/* クイックアクション */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">クイックアクション</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button 
-            onClick={handleTimerStart}
-            className="flex flex-col items-center gap-2 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-          >
-            <Clock className="w-6 h-6 text-blue-600" />
-            <span className="text-sm font-medium text-blue-900">タイマー開始</span>
-          </button>
-          <button 
-            onClick={handleGratitudeMessage}
-            className="flex flex-col items-center gap-2 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-          >
-            <MessageCircle className="w-6 h-6 text-green-600" />
-            <span className="text-sm font-medium text-green-900">感謝メッセージ</span>
-          </button>
-          <button 
-            onClick={handleLearningRecord}
-            className="flex flex-col items-center gap-2 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-          >
-            <BookOpen className="w-6 h-6 text-purple-600" />
-            <span className="text-sm font-medium text-purple-900">学習記録</span>
-          </button>
-          <button 
-            onClick={handleReset}
-            className="flex flex-col items-center gap-2 p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
-          >
-            <RotateCcw className="w-6 h-6 text-orange-600" />
-            <span className="text-sm font-medium text-orange-900">リセット</span>
-          </button>
-        </div>
-      </div>
-      
-      {/* 軽量メトリクス */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Target className="w-6 h-6 text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">軽量メトリクス (今週)</h2>
-            <p className="text-gray-600 text-sm">週20/35以上で良い週</p>
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          {metrics.map((metric) => (
-            <div key={metric.id} className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700 min-w-[120px]">
-                {metric.text}
-              </span>
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1">
-                  {metric.days.map((completed, dayIndex) => (
-                    <button
-                      key={dayIndex}
-                      onClick={() => toggleMetricDay(metric.id, dayIndex)}
-                      className={`w-6 h-6 rounded border-2 transition-colors ${
-                        completed 
-                          ? 'bg-green-500 border-green-500' 
-                          : 'bg-white border-gray-300 hover:border-gray-400'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="ml-2 text-sm font-bold text-gray-900 min-w-[3rem]">
-                  {metric.days.filter(day => day).length}/7
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-700">今週の合計スコア</span>
-            <span className="text-lg font-bold text-blue-900">{metricsScore}/35</span>
-          </div>
-          <div className="mt-2 bg-blue-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(metricsScore / 35) * 100}%` }}
-            />
-          </div>
-          <p className="text-xs text-blue-600 mt-2">
-            {metricsScore >= 20 ? '🎉 良い週です！' : `あと${20 - metricsScore}ポイントで良い週に到達`}
-          </p>
-        </div>
-      </div>
     </div>
   )
 }
-

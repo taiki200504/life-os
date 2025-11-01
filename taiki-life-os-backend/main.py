@@ -9,8 +9,8 @@ from src.models.user import db
 from src.routes.user import user_bp
 from src.routes.notion_routes import notion_bp
 from src.routes.tasks_routes import tasks_bp
-from src.routes.email_routes import email_bp
-from src.routes.sync_routes import sync_bp
+from src.routes.daily_update_routes import daily_update_bp
+from src.routes.notion_unified_routes import notion_unified_bp
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -22,8 +22,8 @@ CORS(app, origins="*")
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(notion_bp, url_prefix='/api/notion')
 app.register_blueprint(tasks_bp, url_prefix='/api/tasks')
-app.register_blueprint(email_bp, url_prefix='/api/email')
-app.register_blueprint(sync_bp, url_prefix='/api')
+app.register_blueprint(daily_update_bp, url_prefix='/api')
+app.register_blueprint(notion_unified_bp, url_prefix='')
 
 # データベース設定
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
