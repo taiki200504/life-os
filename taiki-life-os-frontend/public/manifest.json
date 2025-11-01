@@ -1,0 +1,85 @@
+{
+  "name": "Taiki Life OS",
+  "short_name": "Life OS",
+  "description": "Personal productivity and life management system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/AppIcon_1024_black.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/AppIcon_1024_white.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/AppIcon_1024_black.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/AppIcon_1024_black.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/AppIcon_1024_black.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/AppIcon_1024_black.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/AppIcon_1024_black.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/AppIcon_1024_black.png",
+      "sizes": "120x120",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["productivity", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Start Session",
+      "short_name": "Start",
+      "description": "Start a new work session",
+      "url": "/start",
+      "icons": [{ "src": "/icons/AppIcon_1024_black.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tasks",
+      "short_name": "Tasks",
+      "description": "View and manage tasks",
+      "url": "/tasks",
+      "icons": [{ "src": "/icons/AppIcon_1024_black.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Review",
+      "short_name": "Review",
+      "description": "Daily review",
+      "url": "/review",
+      "icons": [{ "src": "/icons/AppIcon_1024_black.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# Vercel Functions用の依存関係
+# バックエンドのrequirements.txtを参照
+-r ../taiki-life-os-backend/requirements.txt
+
