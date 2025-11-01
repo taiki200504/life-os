@@ -4,7 +4,7 @@
   "installCommand": "cd taiki-life-os-frontend && npm install",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!sw\\.js|manifest\\.json|assets/|icons/).*)",
       "destination": "/index.html"
     }
   ],
@@ -12,6 +12,10 @@
     {
       "source": "/sw.js",
       "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        },
         {
           "key": "Service-Worker-Allowed",
           "value": "/"
