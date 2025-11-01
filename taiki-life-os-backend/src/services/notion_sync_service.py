@@ -1,328 +1,361 @@
-"""
-Notion Sync Service - Notion APIとの双方向同期を管理
-"""
 import os
 import requests
+import json
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
-from src.models.user import db, Task, TaskStatus, User
-
-
-NOTION_TOKEN = os.getenv('NOTION_TOKEN')
-if not NOTION_TOKEN:
-    raise ValueError("NOTION_TOKEN environment variable is required")
-NOTION_VERSION = '2022-06-28'
-NOTION_API_BASE = 'https://api.notion.com/v1'
-
-# データベースID
-TAIKI_TASK_DB_ID = '27fe50949125803fb4cf000cc224824e'
+from typing import Dict, List, Optional
 
 class NotionSyncService:
     def __init__(self):
+        self.api_key = os.environ.get('NOTION_API_KEY')
+        self.parent_page_id = os.environ.get('NOTION_PARENT_PAGE_ID')
+        
+        if not self.api_key:
+            raise ValueError("NOTION_API_KEY environment variable is required")
+        self.base_url = "https://api.notion.com/v1"
         self.headers = {
-            'Authorization': f'Bearer {NOTION_TOKEN}',
-            'Notion-Version': NOTION_VERSION,
-            'Content-Type': 'application/json'
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
         }
-        # 最後の同期時刻を記録するファイルパス
-        self.last_sync_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'last_sync.txt')
-    
-    def _get_last_sync_time(self) -> Optional[str]:
-        """最後の同期時刻を取得"""
-        try:
-            if os.path.exists(self.last_sync_file):
-                with open(self.last_sync_file, 'r') as f:
-                    return f.read().strip()
-        except Exception:
-            pass
-        return None
-    
-    def _update_last_sync_time(self):
-        """最後の同期時刻を更新"""
-        try:
-            os.makedirs(os.path.dirname(self.last_sync_file), exist_ok=True)
-            with open(self.last_sync_file, 'w') as f:
-                f.write(datetime.utcnow().isoformat())
-        except Exception as e:
-            print(f'Error updating last sync time: {e}')
-    
-    # ========== Notion API呼び出し ==========
-    
-    def query_database(self, database_id: str, filter_params: Optional[Dict] = None) -> List[Dict]:
-        """Notionデータベースをクエリ"""
-        url = f'{NOTION_API_BASE}/databases/{database_id}/query'
-        payload = {}
-        if filter_params:
-            payload['filter'] = filter_params
+        self.database_ids = {}
         
+    def create_database(self, title: str, properties: Dict) -> Optional[str]:
+        """Notionデータベースを作成"""
         try:
-            response = requests.post(url, headers=self.headers, json=payload)
-            response.raise_for_status()
-            return response.json().get('results', [])
-        except requests.exceptions.RequestException as e:
-            print(f'Error querying Notion database: {e}')
-            return []
-    
-    def create_page(self, database_id: str, properties: Dict) -> Optional[Dict]:
-        """Notionページを作成"""
-        url = f'{NOTION_API_BASE}/pages'
-        payload = {
-            'parent': {'database_id': database_id},
-            'properties': properties
-        }
-        
-        try:
-            response = requests.post(url, headers=self.headers, json=payload)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f'Error creating Notion page: {e}')
-            return None
-    
-    def update_page(self, page_id: str, properties: Dict) -> Optional[Dict]:
-        """Notionページを更新"""
-        url = f'{NOTION_API_BASE}/pages/{page_id}'
-        payload = {'properties': properties}
-        
-        try:
-            response = requests.patch(url, headers=self.headers, json=payload)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f'Error updating Notion page: {e}')
-            return None
-    
-    def archive_page(self, page_id: str) -> bool:
-        """Notionページをアーカイブ"""
-        url = f'{NOTION_API_BASE}/pages/{page_id}'
-        payload = {'archived': True}
-        
-        try:
-            response = requests.patch(url, headers=self.headers, json=payload)
-            response.raise_for_status()
-            return True
-        except requests.exceptions.RequestException as e:
-            print(f'Error archiving Notion page: {e}')
-            return False
-    
-    # ========== タスク同期 ==========
-    
-    def sync_tasks_from_notion(self) -> Dict[str, int]:
-        """NotionからタスクをTaiki Life OSに同期"""
-        results = {'created': 0, 'updated': 0, 'errors': 0}
-        
-        # Notionからタスクを取得
-        notion_tasks = self.query_database(TAIKI_TASK_DB_ID)
-        
-        # デフォルトユーザーを取得（存在しない場合は作成）
-        user = User.query.filter_by(id='default-user').first()
-        if not user:
-            user = User(
-                id='default-user',
-                email='default-user@example.com',
-                display_name='Default User'
+            data = {
+                "parent": {"page_id": self.parent_page_id},
+                "title": [{"type": "text", "text": {"content": title}}],
+                "properties": properties
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/databases",
+                headers=self.headers,
+                json=data
             )
-            db.session.add(user)
-            db.session.commit()
+            
+            if response.status_code == 200:
+                database = response.json()
+                return database['id']
+            else:
+                print(f"Database creation failed: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            print(f"Error creating database: {e}")
+            return None
+    
+    def setup_life_os_databases(self) -> Dict[str, str]:
+        """Life OS用のデータベースをセットアップ"""
+        databases = {}
         
-        for notion_task in notion_tasks:
-            try:
-                # Notionのプロパティを解析
-                props = notion_task.get('properties', {})
+        # 日次タスクデータベース
+        daily_tasks_properties = {
+            "タスク名": {"title": {}},
+            "完了": {"checkbox": {}},
+            "日付": {"date": {}},
+            "カテゴリ": {
+                "select": {
+                    "options": [
+                        {"name": "静寂", "color": "blue"},
+                        {"name": "深い仕事", "color": "purple"},
+                        {"name": "運動", "color": "green"},
+                        {"name": "学習", "color": "orange"},
+                        {"name": "感謝", "color": "red"},
+                        {"name": "リセット", "color": "gray"}
+                    ]
+                }
+            }
+        }
+        
+        daily_db_id = self.create_database("Life OS - 日次タスク", daily_tasks_properties)
+        if daily_db_id:
+            databases['daily_tasks'] = daily_db_id
+        
+        # 週次目標データベース
+        weekly_goals_properties = {
+            "目標名": {"title": {}},
+            "現在値": {"number": {}},
+            "目標値": {"number": {}},
+            "週": {"date": {}},
+            "達成率": {"formula": {"expression": "prop(\"現在値\") / prop(\"目標値\") * 100"}}
+        }
+        
+        weekly_db_id = self.create_database("Life OS - 週次目標", weekly_goals_properties)
+        if weekly_db_id:
+            databases['weekly_goals'] = weekly_db_id
+        
+        # メトリクスデータベース
+        metrics_properties = {
+            "メトリクス名": {"title": {}},
+            "日付": {"date": {}},
+            "完了": {"checkbox": {}},
+            "週": {"formula": {"expression": "formatDate(prop(\"日付\"), \"YYYY-[W]WW\")"}}
+        }
+        
+        metrics_db_id = self.create_database("Life OS - メトリクス", metrics_properties)
+        if metrics_db_id:
+            databases['metrics'] = metrics_db_id
+        
+        self.database_ids = databases
+        return databases
+    
+    def sync_daily_tasks(self, tasks: List[Dict]) -> bool:
+        """日次タスクをNotionに同期"""
+        if 'daily_tasks' not in self.database_ids:
+            return False
+            
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            
+            for task in tasks:
+                # 既存のタスクをチェック
+                existing = self.find_task_by_name_and_date(
+                    self.database_ids['daily_tasks'], 
+                    task['text'], 
+                    today
+                )
                 
-                # タスク名
-                title_prop = props.get('Name') or props.get('タスク名') or props.get('Task')
-                if not title_prop:
-                    continue
-                
-                title = ''
-                if title_prop.get('title'):
-                    title = ''.join([t.get('plain_text', '') for t in title_prop['title']])
-                
-                if not title:
-                    continue
-                
-                # ステータス
-                status_prop = props.get('Status') or props.get('ステータス')
-                status = TaskStatus.INBOX
-                if status_prop and status_prop.get('select'):
-                    status_text = status_prop['select'].get('name', '').lower()
-                    if 'today' in status_text or '今日' in status_text:
-                        status = TaskStatus.TODAY
-                    elif 'done' in status_text or '完了' in status_text:
-                        status = TaskStatus.DONE
-                
-                # エリア
-                area_prop = props.get('Area') or props.get('エリア')
-                area = None
-                if area_prop and area_prop.get('select'):
-                    area = area_prop['select'].get('name')
-                
-                # 期限
-                deadline_prop = props.get('Deadline') or props.get('期限')
-                deadline = None
-                if deadline_prop and deadline_prop.get('date'):
-                    deadline_str = deadline_prop['date'].get('start')
-                    if deadline_str:
-                        try:
-                            deadline = datetime.strptime(deadline_str.split('T')[0], '%Y-%m-%d').date()
-                        except (ValueError, IndexError):
-                            deadline = None
-                
-                # Notion IDで既存タスクを検索
-                notion_id = notion_task['id']
-                existing_task = Task.query.filter_by(notion_id=notion_id).first()
-                
-                if existing_task:
+                if existing:
                     # 更新
-                    existing_task.title = title
-                    existing_task.status = status
-                    existing_task.area = area
-                    existing_task.deadline = deadline
-                    existing_task.updated_at = datetime.utcnow()
-                    results['updated'] += 1
+                    self.update_task(existing['id'], task['completed'])
                 else:
                     # 新規作成
-                    new_task = Task(
-                        user_id='default-user',
-                        title=title,
-                        status=status,
-                        area=area,
-                        deadline=deadline,
-                        notion_id=notion_id
+                    self.create_task(
+                        self.database_ids['daily_tasks'],
+                        task['text'],
+                        task['completed'],
+                        today,
+                        self.get_task_category(task['text'])
                     )
-                    db.session.add(new_task)
-                    results['created'] += 1
-                
-            except Exception as e:
-                print(f'Error syncing task from Notion: {e}')
-                results['errors'] += 1
-        
-        db.session.commit()
-        
-        # 最後の同期時刻を更新
-        self._update_last_sync_time()
-        
-        return results
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error syncing daily tasks: {e}")
+            return False
     
-    def sync_tasks_to_notion(self) -> Dict[str, int]:
-        """Taiki Life OSからNotionにタスクを同期"""
-        results = {'created': 0, 'updated': 0, 'errors': 0}
-        
-        # Notion IDが未設定のタスクを取得
-        tasks_without_notion = Task.query.filter(
-            db.or_(Task.notion_id.is_(None), Task.notion_id == '')
-        ).all()
-        
-        for task in tasks_without_notion:
-            try:
-                # Notionプロパティを構築
-                properties = {
-                    'Name': {
-                        'title': [{'text': {'content': task.title}}]
-                    }
-                }
+    def sync_weekly_goals(self, goals: List[Dict]) -> bool:
+        """週次目標をNotionに同期"""
+        if 'weekly_goals' not in self.database_ids:
+            return False
+            
+        try:
+            # 今週の月曜日を取得
+            today = datetime.now()
+            monday = today - timedelta(days=today.weekday())
+            week_start = monday.strftime("%Y-%m-%d")
+            
+            for goal in goals:
+                # 既存の目標をチェック
+                existing = self.find_goal_by_name_and_week(
+                    self.database_ids['weekly_goals'],
+                    goal['text'],
+                    week_start
+                )
                 
-                # ステータス
-                status_map = {
-                    TaskStatus.INBOX: 'Inbox',
-                    TaskStatus.TODAY: 'Today',
-                    TaskStatus.DONE: 'Done'
-                }
-                properties['Status'] = {
-                    'select': {'name': status_map.get(task.status, 'Inbox')}
-                }
-                
-                # エリア
-                if task.area:
-                    properties['Area'] = {
-                        'select': {'name': task.area}
-                    }
-                
-                # 期限
-                if task.deadline:
-                    properties['Deadline'] = {
-                        'date': {'start': task.deadline.isoformat()}
-                    }
-                
-                # Notionにページを作成
-                notion_page = self.create_page(TAIKI_TASK_DB_ID, properties)
-                
-                if notion_page:
-                    # Notion IDを保存
-                    task.notion_id = notion_page['id']
-                    task.updated_at = datetime.utcnow()
-                    results['created'] += 1
+                if existing:
+                    # 更新
+                    self.update_goal(existing['id'], goal['current'], goal['target'])
                 else:
-                    results['errors'] += 1
-                
-            except Exception as e:
-                print(f'Error syncing task to Notion: {e}')
-                results['errors'] += 1
-        
-        # Notion IDが設定済みで更新されたタスクを同期（最近5分以内に更新されたもの）
-        five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
-        updated_tasks = Task.query.filter(
-            Task.notion_id.isnot(None),
-            Task.notion_id != '',
-            Task.updated_at >= five_minutes_ago
-        ).all()
-        
-        for task in updated_tasks:
-            try:
-                properties = {}
-                
-                # ステータス
-                status_map = {
-                    TaskStatus.INBOX: 'Inbox',
-                    TaskStatus.TODAY: 'Today',
-                    TaskStatus.DONE: 'Done'
-                }
-                properties['Status'] = {
-                    'select': {'name': status_map.get(task.status, 'Inbox')}
-                }
-                
-                # タイトルも更新する場合
-                properties['Name'] = {
-                    'title': [{'text': {'content': task.title}}]
-                }
-                
-                # Notionページを更新
-                if self.update_page(task.notion_id, properties):
-                    results['updated'] += 1
-                else:
-                    results['errors'] += 1
-                
-            except Exception as e:
-                print(f'Error updating task in Notion: {e}')
-                results['errors'] += 1
-        
-        db.session.commit()
-        
-        # 最後の同期時刻を更新
-        self._update_last_sync_time()
-        
-        return results
+                    # 新規作成
+                    self.create_goal(
+                        self.database_ids['weekly_goals'],
+                        goal['text'],
+                        goal['current'],
+                        goal['target'],
+                        week_start
+                    )
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error syncing weekly goals: {e}")
+            return False
     
-    def sync_all(self) -> Dict[str, Any]:
-        """すべてのデータを双方向同期"""
-        results = {
-            'timestamp': datetime.now().isoformat(),
-            'from_notion': {},
-            'to_notion': {}
-        }
-        
-        # Notion → Taiki Life OS
-        results['from_notion']['tasks'] = self.sync_tasks_from_notion()
-        
-        # Taiki Life OS → Notion
-        results['to_notion']['tasks'] = self.sync_tasks_to_notion()
-        
-        # 最後の同期時刻を更新
-        self._update_last_sync_time()
-        
-        return results
+    def find_task_by_name_and_date(self, database_id: str, task_name: str, date: str) -> Optional[Dict]:
+        """タスク名と日付でタスクを検索"""
+        try:
+            filter_data = {
+                "and": [
+                    {
+                        "property": "タスク名",
+                        "title": {"equals": task_name}
+                    },
+                    {
+                        "property": "日付",
+                        "date": {"equals": date}
+                    }
+                ]
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/databases/{database_id}/query",
+                headers=self.headers,
+                json={"filter": filter_data}
+            )
+            
+            if response.status_code == 200:
+                results = response.json()['results']
+                return results[0] if results else None
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error finding task: {e}")
+            return None
+    
+    def find_goal_by_name_and_week(self, database_id: str, goal_name: str, week_start: str) -> Optional[Dict]:
+        """目標名と週でゴールを検索"""
+        try:
+            filter_data = {
+                "and": [
+                    {
+                        "property": "目標名",
+                        "title": {"equals": goal_name}
+                    },
+                    {
+                        "property": "週",
+                        "date": {"equals": week_start}
+                    }
+                ]
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/databases/{database_id}/query",
+                headers=self.headers,
+                json={"filter": filter_data}
+            )
+            
+            if response.status_code == 200:
+                results = response.json()['results']
+                return results[0] if results else None
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error finding goal: {e}")
+            return None
+    
+    def create_task(self, database_id: str, task_name: str, completed: bool, date: str, category: str):
+        """新しいタスクを作成"""
+        try:
+            data = {
+                "parent": {"database_id": database_id},
+                "properties": {
+                    "タスク名": {"title": [{"text": {"content": task_name}}]},
+                    "完了": {"checkbox": completed},
+                    "日付": {"date": {"start": date}},
+                    "カテゴリ": {"select": {"name": category}}
+                }
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/pages",
+                headers=self.headers,
+                json=data
+            )
+            
+            return response.status_code == 200
+            
+        except Exception as e:
+            print(f"Error creating task: {e}")
+            return False
+    
+    def create_goal(self, database_id: str, goal_name: str, current: int, target: int, week_start: str):
+        """新しい目標を作成"""
+        try:
+            data = {
+                "parent": {"database_id": database_id},
+                "properties": {
+                    "目標名": {"title": [{"text": {"content": goal_name}}]},
+                    "現在値": {"number": current},
+                    "目標値": {"number": target},
+                    "週": {"date": {"start": week_start}}
+                }
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/pages",
+                headers=self.headers,
+                json=data
+            )
+            
+            return response.status_code == 200
+            
+        except Exception as e:
+            print(f"Error creating goal: {e}")
+            return False
+    
+    def update_task(self, page_id: str, completed: bool):
+        """タスクの完了状態を更新"""
+        try:
+            data = {
+                "properties": {
+                    "完了": {"checkbox": completed}
+                }
+            }
+            
+            response = requests.patch(
+                f"{self.base_url}/pages/{page_id}",
+                headers=self.headers,
+                json=data
+            )
+            
+            return response.status_code == 200
+            
+        except Exception as e:
+            print(f"Error updating task: {e}")
+            return False
+    
+    def update_goal(self, page_id: str, current: int, target: int):
+        """目標の進捗を更新"""
+        try:
+            data = {
+                "properties": {
+                    "現在値": {"number": current},
+                    "目標値": {"number": target}
+                }
+            }
+            
+            response = requests.patch(
+                f"{self.base_url}/pages/{page_id}",
+                headers=self.headers,
+                json=data
+            )
+            
+            return response.status_code == 200
+            
+        except Exception as e:
+            print(f"Error updating goal: {e}")
+            return False
+    
+    def get_task_category(self, task_text: str) -> str:
+        """タスクテキストからカテゴリを判定"""
+        if "静寂" in task_text or "瞑想" in task_text:
+            return "静寂"
+        elif "深い仕事" in task_text or "仕事" in task_text:
+            return "深い仕事"
+        elif "身体" in task_text or "運動" in task_text:
+            return "運動"
+        elif "学習" in task_text or "英語" in task_text or "コード" in task_text:
+            return "学習"
+        elif "感謝" in task_text or "連絡" in task_text:
+            return "感謝"
+        elif "リセット" in task_text or "片付け" in task_text:
+            return "リセット"
+        else:
+            return "その他"
+    
+    def test_connection(self) -> bool:
+        """Notion API接続をテスト"""
+        try:
+            response = requests.get(
+                f"{self.base_url}/users/me",
+                headers=self.headers
+            )
+            return response.status_code == 200
+        except Exception as e:
+            print(f"Connection test failed: {e}")
+            return False
 
-
-# グローバルインスタンス
-notion_sync = NotionSyncService()
