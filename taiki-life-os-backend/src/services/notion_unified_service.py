@@ -477,4 +477,160 @@ class NotionUnifiedService(NotionService):
             "title": title,
             "content": content
         }
+    
+    # ===== ページコンテンツ取得（汎用） =====
+    
+    def get_page(self, page_id: str) -> Optional[Dict]:
+        """Notionページのプロパティ情報を取得"""
+        try:
+            response = requests.get(
+                f"{self.base_url}/pages/{page_id}",
+                headers=self.headers
+            )
+            if response.status_code == 200:
+                return response.json()
+            return None
+        except Exception as e:
+            print(f"Error getting page: {e}")
+            return None
+    
+    def get_page_blocks(self, page_id: str, recursive: bool = True) -> List[Dict]:
+        """Notionページのブロック（コンテンツ）を取得
+        
+        Args:
+            page_id: ページID
+            recursive: Trueの場合、ネストされたブロックも再帰的に取得
+        
+        Returns:
+            ブロックのリスト
+        """
+        try:
+            all_blocks = []
+            next_cursor = None
+            
+            while True:
+                url = f"{self.base_url}/blocks/{page_id}/children"
+                params = {"page_size": 100}
+                if next_cursor:
+                    params["start_cursor"] = next_cursor
+                
+                response = requests.get(url, headers=self.headers, params=params)
+                
+                if response.status_code != 200:
+                    break
+                
+                data = response.json()
+                blocks = data.get("results", [])
+                all_blocks.extend(blocks)
+                
+                # 再帰的にネストされたブロックを取得
+                if recursive:
+                    for block in blocks:
+                        if block.get("has_children", False):
+                            child_blocks = self.get_page_blocks(block["id"], recursive=True)
+                            all_blocks.extend(child_blocks)
+                
+                next_cursor = data.get("next_cursor")
+                if not next_cursor:
+                    break
+            
+            return all_blocks
+        except Exception as e:
+            print(f"Error getting page blocks: {e}")
+            return []
+    
+    def get_page_full_content(self, page_id: str) -> Optional[Dict]:
+        """ページのプロパティとブロックを含む完全なコンテンツを取得
+        
+        Returns:
+            {
+                "page": {...},  # ページプロパティ
+                "blocks": [...]  # ブロックのリスト
+            }
+        """
+        page = self.get_page(page_id)
+        if not page:
+            return None
+        
+        blocks = self.get_page_blocks(page_id, recursive=True)
+        
+        return {
+            "page": page,
+            "blocks": blocks
+        }
+    
+    def parse_block_content(self, block: Dict) -> str:
+        """ブロックからテキストコンテンツを抽出
+        
+        サポートするブロックタイプ:
+        - paragraph, heading_1, heading_2, heading_3
+        - bulleted_list_item, numbered_list_item
+        - to_do, toggle, quote, callout
+        """
+        block_type = block.get("type")
+        if not block_type:
+            return ""
+        
+        block_content = block.get(block_type, {})
+        
+        # rich_textを取得
+        rich_text = block_content.get("rich_text", [])
+        if not rich_text:
+            # to_doの場合はtextではなくrich_text
+            text = block_content.get("text", [])
+            if text:
+                rich_text = text
+        
+        # テキストを結合
+        text_content = "".join([
+            item.get("text", {}).get("content", "")
+            for item in rich_text
+        ])
+        
+        return text_content
+    
+    def extract_page_text(self, page_id: str) -> str:
+        """ページの全テキストコンテンツを抽出して結合"""
+        blocks = self.get_page_blocks(page_id, recursive=True)
+        texts = []
+        
+        for block in blocks:
+            text = self.parse_block_content(block)
+            if text:
+                texts.append(text)
+        
+        return "\n".join(texts)
+    
+    def search_pages(self, query: str = "") -> List[Dict]:
+        """Notionワークスペース内でページを検索
+        
+        Args:
+            query: 検索キーワード（空の場合は全ページ）
+        
+        Returns:
+            ページのリスト
+        """
+        try:
+            payload = {
+                "filter": {
+                    "value": "page",
+                    "property": "object"
+                }
+            }
+            
+            if query:
+                payload["query"] = query
+            
+            response = requests.post(
+                f"{self.base_url}/search",
+                headers=self.headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                return response.json().get("results", [])
+            return []
+        except Exception as e:
+            print(f"Error searching pages: {e}")
+            return []
 

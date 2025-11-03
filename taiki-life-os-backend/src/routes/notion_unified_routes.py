@@ -210,6 +210,99 @@ def update_life_rule(rule_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+# ===== ページコンテンツ取得API =====
+
+@notion_unified_bp.route('/api/notion/pages/<page_id>', methods=['GET'])
+def get_page_content(page_id):
+    """Notionページのプロパティ情報を取得"""
+    try:
+        service = get_notion_service()
+        page = service.get_page(page_id)
+        
+        if page:
+            return jsonify({
+                "success": True,
+                "page": page
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "ページが見つかりません"
+            }), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@notion_unified_bp.route('/api/notion/pages/<page_id>/blocks', methods=['GET'])
+def get_page_blocks(page_id):
+    """Notionページのブロック（コンテンツ）を取得"""
+    try:
+        recursive = request.args.get('recursive', 'true').lower() == 'true'
+        
+        service = get_notion_service()
+        blocks = service.get_page_blocks(page_id, recursive=recursive)
+        
+        return jsonify({
+            "success": True,
+            "page_id": page_id,
+            "blocks": blocks,
+            "count": len(blocks)
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@notion_unified_bp.route('/api/notion/pages/<page_id>/content', methods=['GET'])
+def get_page_full_content(page_id):
+    """ページのプロパティとブロックを含む完全なコンテンツを取得"""
+    try:
+        service = get_notion_service()
+        content = service.get_page_full_content(page_id)
+        
+        if content:
+            return jsonify({
+                "success": True,
+                "content": content
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "ページが見つかりません"
+            }), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@notion_unified_bp.route('/api/notion/pages/<page_id>/text', methods=['GET'])
+def get_page_text(page_id):
+    """ページの全テキストコンテンツを抽出"""
+    try:
+        service = get_notion_service()
+        text = service.extract_page_text(page_id)
+        
+        return jsonify({
+            "success": True,
+            "page_id": page_id,
+            "text": text
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@notion_unified_bp.route('/api/notion/pages/search', methods=['POST'])
+def search_pages():
+    """Notionワークスペース内でページを検索"""
+    try:
+        data = request.get_json() or {}
+        query = data.get('query', '')
+        
+        service = get_notion_service()
+        pages = service.search_pages(query)
+        
+        return jsonify({
+            "success": True,
+            "pages": pages,
+            "count": len(pages)
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # ===== データベース検索API =====
 
 @notion_unified_bp.route('/api/notion/databases/search', methods=['POST'])
