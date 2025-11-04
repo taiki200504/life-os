@@ -67,37 +67,51 @@ export default function Dashboard() {
     return () => clearInterval(timer)
   }, [])
   
-  // 5分ごとの自動同期
+  // 初回読み込み時と5分ごとの自動同期
   useEffect(() => {
+    // 初回読み込み時にNotionから取得
+    fetchTasksFromNotion()
+    fetchWeeklyGoalsFromNotion()
+    
+    // 5分ごとの自動同期
     const syncInterval = setInterval(() => {
       syncWithNotion()
     }, 5 * 60 * 1000) // 5分 = 300000ms
     
-    // 初回読み込み時も同期
-    syncWithNotion()
-    
     return () => clearInterval(syncInterval)
-  }, [tasks, weeklyTasks])
+  }, []) // 依存配列を空にして、初回のみ実行
   
   // Notionからタスクを取得
   const fetchTasksFromNotion = async () => {
     try {
-      const response = await fetch(`${API_BASE}/notion/taiki-tasks`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.tasks && data.tasks.length > 0) {
-          // Notionのタスクをローカルに反映
-          const notionTasks = data.tasks.map(task => ({
-            id: task.id || Date.now() + Math.random(),
-            text: task.name || task.title,
-            completed: task.completed || false,
-            icon: getIconFromCategory(task.category),
-            color: 'gray',
-            notionId: task.notion_id
-          }))
+      const today = new Date().toISOString().split('T')[0]
+      const response = await fetch(`${API_BASE}/notion/taiki-tasks?date=${today}`)
+      
+      if (!response.ok) {
+        console.error('Failed to fetch tasks:', response.status, response.statusText)
+        return
+      }
+      
+      const data = await response.json()
+      
+      if (data.success && data.tasks) {
+        // Notionのタスクをローカルに反映（0件でも反映）
+        const notionTasks = data.tasks.map((task, index) => ({
+          id: task.notion_id || `notion-${Date.now()}-${index}`,
+          text: task.name || task.title || '',
+          completed: task.completed || false,
+          icon: getIconFromCategory(task.category),
+          color: 'gray',
+          notionId: task.notion_id
+        }))
+        
+        // Notionからデータが取得できた場合は、それを優先
+        if (notionTasks.length > 0 || data.count === 0) {
           setTasks(notionTasks)
           setLastSync(new Date())
         }
+      } else {
+        console.error('Notion API error:', data.error)
       }
     } catch (error) {
       console.error('Failed to fetch tasks from Notion:', error)
@@ -108,20 +122,32 @@ export default function Dashboard() {
   const fetchWeeklyGoalsFromNotion = async () => {
     try {
       const response = await fetch(`${API_BASE}/notion/weekly-goals`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.goals && data.goals.length > 0) {
-          const notionGoals = data.goals.map(goal => ({
-            id: goal.id || Date.now() + Math.random(),
-            text: goal.name,
-            current: goal.current || 0,
-            target: goal.target || 0,
-            unit: goal.unit || '回',
-            color: 'green',
-            notionId: goal.notion_id
-          }))
+      
+      if (!response.ok) {
+        console.error('Failed to fetch weekly goals:', response.status, response.statusText)
+        return
+      }
+      
+      const data = await response.json()
+      
+      if (data.success && data.goals) {
+        // Notionの週次目標をローカルに反映（0件でも反映）
+        const notionGoals = data.goals.map((goal, index) => ({
+          id: goal.notion_id || `notion-goal-${Date.now()}-${index}`,
+          text: goal.name || '',
+          current: goal.current || 0,
+          target: goal.target || 0,
+          unit: goal.unit || '回',
+          color: 'green',
+          notionId: goal.notion_id
+        }))
+        
+        // Notionからデータが取得できた場合は、それを優先
+        if (notionGoals.length > 0 || data.count === 0) {
           setWeeklyTasks(notionGoals)
         }
+      } else {
+        console.error('Notion API error:', data.error)
       }
     } catch (error) {
       console.error('Failed to fetch weekly goals from Notion:', error)
@@ -168,7 +194,7 @@ export default function Dashboard() {
   const syncWithNotion = async () => {
     setSyncing(true)
     try {
-      // Notionから取得
+      // Notionから取得（最新データを取得）
       await Promise.all([
         fetchTasksFromNotion(),
         fetchWeeklyGoalsFromNotion()
