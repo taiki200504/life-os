@@ -33,8 +33,9 @@ def health():
     """ヘルスチェックエンドポイント"""
     return {'status': 'ok', 'service': 'taiki-life-os-api'}, 200
 
-# Vercel Functions用のエクスポート
-# Vercelは自動的にこのappを検出する
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+# Vercel Functions用のハンドラー
+# Vercelはこのhandler関数を検出する
+def handler(request):
+    """Vercel Serverless Functions用のリクエストハンドラー"""
+    return app(request.environ, lambda status, headers: None)
 
