@@ -13,6 +13,27 @@ class NotionUnifiedService(NotionService):
     def __init__(self, api_key: str = None):
         super().__init__(api_key)
         self._database_cache = {}  # データベースIDのキャッシュ
+        # 環境変数によるDB ID固定（あれば最優先で利用）
+        self.db_id_taiki_task = self._normalize_id(os.getenv("NOTION_DB_TAIKI_TASK"))
+        self.db_id_weekly_goals = self._normalize_id(os.getenv("NOTION_DB_WEEKLY_GOALS"))
+        self.db_id_life_plan = self._normalize_id(os.getenv("NOTION_DB_LIFE_PLAN"))
+        self.db_id_life_rules = self._normalize_id(os.getenv("NOTION_DB_LIFE_RULES"))
+
+    def _get_db_id(self, fallback_name: str, env_db_id: Optional[str]) -> Optional[str]:
+        """DB IDを環境変数優先で取得し、なければ名称検索にフォールバック"""
+        if env_db_id:
+            return env_db_id
+        return self.find_database_by_name(fallback_name)
+
+    def _normalize_id(self, db_id: Optional[str]) -> Optional[str]:
+        """NotionのIDが32桁の連結形式ならハイフン区切りに正規化"""
+        if not db_id:
+            return db_id
+        raw = db_id.replace("-", "").strip()
+        if len(raw) != 32:
+            return db_id
+        # 8-4-4-4-12 に挿入
+        return f"{raw[0:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:32]}"
     
     def find_database_by_name(self, database_name: str) -> Optional[str]:
         """データベース名でデータベースIDを検索"""
@@ -60,7 +81,7 @@ class NotionUnifiedService(NotionService):
         if target_date is None:
             target_date = date.today()
         
-        db_id = self.find_database_by_name("Taiki Task")
+        db_id = self._get_db_id("Taiki Task", self.db_id_taiki_task)
         if not db_id:
             return []
         
@@ -79,7 +100,7 @@ class NotionUnifiedService(NotionService):
         if target_date is None:
             target_date = date.today()
         
-        db_id = self.find_database_by_name("Taiki Task")
+        db_id = self._get_db_id("Taiki Task", self.db_id_taiki_task)
         if not db_id:
             return None
         
@@ -112,7 +133,7 @@ class NotionUnifiedService(NotionService):
     
     def sync_taiki_tasks(self, tasks: List[Dict]) -> Dict:
         """Taiki Taskを双方向同期"""
-        db_id = self.find_database_by_name("Taiki Task")
+        db_id = self._get_db_id("Taiki Task", self.db_id_taiki_task)
         if not db_id:
             return {"success": False, "error": "Taiki Taskデータベースが見つかりません"}
         
@@ -226,7 +247,7 @@ class NotionUnifiedService(NotionService):
             today = date.today()
             week_start = today - timedelta(days=today.weekday())
         
-        db_id = self.find_database_by_name("Weekly Goals")
+        db_id = self._get_db_id("Weekly Goals", self.db_id_weekly_goals)
         if not db_id:
             return []
         
@@ -242,7 +263,7 @@ class NotionUnifiedService(NotionService):
     
     def sync_weekly_goals(self, goals: List[Dict]) -> Dict:
         """Weekly Goalsを双方向同期"""
-        db_id = self.find_database_by_name("Weekly Goals")
+        db_id = self._get_db_id("Weekly Goals", self.db_id_weekly_goals)
         if not db_id:
             return {"success": False, "error": "Weekly Goalsデータベースが見つかりません"}
         
@@ -299,7 +320,7 @@ class NotionUnifiedService(NotionService):
             today = date.today()
             week_start = today - timedelta(days=today.weekday())
         
-        db_id = self.find_database_by_name("Weekly Goals")
+        db_id = self._get_db_id("Weekly Goals", self.db_id_weekly_goals)
         if not db_id:
             return None
         
@@ -362,7 +383,7 @@ class NotionUnifiedService(NotionService):
     
     def get_life_plan(self) -> Optional[Dict]:
         """人生計画データベースからデータを取得"""
-        db_id = self.find_database_by_name("人生計画")
+        db_id = self._get_db_id("人生計画", self.db_id_life_plan)
         if not db_id:
             return None
         
@@ -378,7 +399,7 @@ class NotionUnifiedService(NotionService):
     
     def update_life_plan(self, life_plan_data: Dict) -> bool:
         """人生計画を更新"""
-        db_id = self.find_database_by_name("人生計画")
+        db_id = self._get_db_id("人生計画", self.db_id_life_plan)
         if not db_id:
             return False
         
@@ -395,7 +416,7 @@ class NotionUnifiedService(NotionService):
     
     def create_life_plan_entry(self, life_plan_data: Dict) -> Optional[str]:
         """人生計画エントリを作成"""
-        db_id = self.find_database_by_name("人生計画")
+        db_id = self._get_db_id("人生計画", self.db_id_life_plan)
         if not db_id:
             return None
         
@@ -435,7 +456,7 @@ class NotionUnifiedService(NotionService):
     
     def get_life_rules(self) -> List[Dict]:
         """LIFEルールデータベースからルールを取得"""
-        db_id = self.find_database_by_name("LIFEルール")
+        db_id = self._get_db_id("LIFEルール", self.db_id_life_rules)
         if not db_id:
             return []
         
