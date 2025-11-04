@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#0a0a0a"/>
+  <!-- outer circle -->
+  <circle cx="512" cy="512" r="380" fill="none" stroke="#ffffff" stroke-width="64"/>
+  <!-- sprout -->
+  <g fill="#ffffff">
+    <!-- leaves -->
+    <path d="M512 560c120 0 200 84 216 104-48 36-124 68-216 68s-168-32-216-68c16-20 96-104 216-104z"/>
+    <path d="M512 384c-8 0-16 0-24 2-88 14-160 82-164 168 88 8 168-56 184-142 2-8 4-18 4-28z"/>
+    <path d="M512 384c8 0 16 0 24 2 88 14 160 82 164 168-88 8-168-56-184-142-2-8-4-18-4-28z"/>
+    <!-- stem -->
+    <rect x="492" y="468" width="40" height="200" rx="20"/>
+  </g>
+</svg>
+
+
