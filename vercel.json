@@ -2,9 +2,18 @@
   "buildCommand": "cd taiki-life-os-frontend && npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "taiki-life-os-frontend/dist",
   "installCommand": "cd taiki-life-os-frontend && npm install --legacy-peer-deps",
+  "functions": {
+    "api/app.py": {
+      "runtime": "python3.9"
+    }
+  },
   "rewrites": [
     {
-      "source": "/((?!sw\\.js|manifest\\.json|assets|icons|favicon\\.ico).*)",
+      "source": "/api/(.*)",
+      "destination": "/api/app.py"
+    },
+    {
+      "source": "/((?!api|sw\\.js|manifest\\.json|assets|icons|favicon\\.ico).*)",
       "destination": "/index.html"
     }
   ],

@@ -1,13 +1,15 @@
 import requests
 import json
+import os
 from datetime import datetime, date
 from typing import Dict, List, Optional, Any
-from src.models.notion_models import NotionConfig
 
 class NotionService:
     """Notion APIとの連携を管理するサービスクラス"""
     
     def __init__(self, api_key: str = None):
+        if api_key is None:
+            api_key = os.getenv('NOTION_API_KEY')
         self.api_key = api_key
         self.base_url = "https://api.notion.com/v1"
         self.headers = {
@@ -15,11 +17,6 @@ class NotionService:
             "Content-Type": "application/json",
             "Notion-Version": "2022-06-28"
         }
-    
-    @classmethod
-    def from_config(cls, config: NotionConfig):
-        """設定からNotionServiceインスタンスを作成"""
-        return cls(api_key=config.api_key)
     
     def test_connection(self) -> bool:
         """Notion APIへの接続をテスト"""
