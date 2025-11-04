@@ -35,7 +35,23 @@ def health():
 
 # Vercel Functions用のハンドラー
 # Vercelはこのhandler関数を検出する
-def handler(request):
+def handler(req):
     """Vercel Serverless Functions用のリクエストハンドラー"""
-    return app(request.environ, lambda status, headers: None)
+    from vercel import Response
+    
+    # FlaskアプリをWSGIとして実行
+    with app.test_request_context(
+        path=req.path,
+        method=req.method,
+        headers=dict(req.headers),
+        query_string=req.query_string,
+        data=req.body
+    ) as ctx:
+        response = app.full_dispatch_request()
+        
+        return Response(
+            response.get_data(),
+            status=response.status_code,
+            headers=dict(response.headers)
+        )
 
