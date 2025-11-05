@@ -1,25 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Database, CheckCircle, AlertCircle, RotateCcw as Sync, Bell, Palette, User } from 'lucide-react';
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 const Settings = () => {
   const [config, setConfig] = useState({
     configured: false,
+    api_key_set: false,
+    connection_test: false,
+    error: null,
     database_ids: {}
   });
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchConfig();
   }, []);
 
   const fetchConfig = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/notion/config');
-      const data = await response.json();
-      setConfig(data);
+      const response = await fetch(`${API_BASE}/notion/config`);
+      if (response.ok) {
+        const data = await response.json();
+        setConfig(data);
+      } else {
+        const errorData = await response.json();
+        setConfig({
+          configured: false,
+          api_key_set: false,
+          connection_test: false,
+          error: errorData.error || '設定の取得に失敗しました',
+          database_ids: {}
+        });
+      }
     } catch (error) {
       console.error('設定の取得に失敗しました:', error);
+      setConfig({
+        configured: false,
+        api_key_set: false,
+        connection_test: false,
+        error: 'ネットワークエラーが発生しました',
+        database_ids: {}
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,23 +55,33 @@ const Settings = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      // 日次タスクの同期
-      const tasksResponse = await fetch('/api/notion/sync/daily-tasks', {
+      // タスクと週次目標の同期
+      const tasksResponse = await fetch(`${API_BASE}/notion/taiki-tasks/sync`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tasks: [] }), // 空の配列でも同期を実行
       });
 
-      // 週間目標の同期
-      const goalsResponse = await fetch('/api/notion/sync/weekly-goals', {
+      const goalsResponse = await fetch(`${API_BASE}/notion/weekly-goals/sync`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ goals: [] }), // 空の配列でも同期を実行
       });
 
       if (tasksResponse.ok && goalsResponse.ok) {
         setMessage({ type: 'success', text: 'Notionとの同期が完了しました' });
+        // 設定を再取得
+        await fetchConfig();
       } else {
-        setMessage({ type: 'error', text: '同期中にエラーが発生しました' });
+        const errorText = await tasksResponse.text();
+        setMessage({ type: 'error', text: `同期中にエラーが発生しました: ${errorText}` });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: '同期に失敗しました' });
+      setMessage({ type: 'error', text: `同期に失敗しました: ${error.message}` });
     } finally {
       setSyncing(false);
     }
@@ -71,39 +108,79 @@ const Settings = () => {
         </h2>
         
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            {config.configured ? (
-              <CheckCircle className="w-5 h-5 text-green-500" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-red-500" />
-            )}
-            <span className={`font-medium ${config.configured ? 'text-green-700' : 'text-red-700'}`}>
-              {config.configured ? 'Notion API接続済み' : 'Notion API未接続'}
-            </span>
-          </div>
-
-          {config.configured && (
-            <div className="ml-8 space-y-2 text-sm text-gray-600">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>✓ Daily Tasks Database</div>
-                <div>✓ Weekly Goals Database</div>
-                <div>✓ Metrics Database</div>
-                <div>✓ 自動同期設定済み</div>
+          {loading ? (
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                {config.configured ? (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-red-500" />
+                )}
+                <span className={`font-medium ${config.configured ? 'text-green-700' : 'text-red-700'}`}>
+                  {config.configured ? 'Notion API接続済み' : 'Notion API未接続'}
+                </span>
               </div>
-            </div>
-          )}
 
-          {config.configured && (
-            <div className="pt-4 border-t border-gray-200">
-              <button
-                onClick={syncWithNotion}
-                disabled={syncing}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Sync className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? '同期中...' : '手動同期'}
-              </button>
-            </div>
+              {config.error && (
+                <div className="ml-8 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-800">
+                    <strong>エラー:</strong> {config.error}
+                  </p>
+                </div>
+              )}
+
+              <div className="ml-8 space-y-2 text-sm text-gray-600">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className={config.api_key_set ? 'text-green-600' : 'text-red-600'}>
+                    {config.api_key_set ? '✓' : '✗'} Notion APIキー
+                  </div>
+                  <div className={config.database_ids?.taiki_task ? 'text-green-600' : 'text-red-600'}>
+                    {config.database_ids?.taiki_task ? '✓' : '✗'} Taiki Task Database
+                  </div>
+                  <div className={config.database_ids?.weekly_goals ? 'text-green-600' : 'text-red-600'}>
+                    {config.database_ids?.weekly_goals ? '✓' : '✗'} Weekly Goals Database
+                  </div>
+                  <div className={config.database_ids?.life_plan ? 'text-green-600' : 'text-red-600'}>
+                    {config.database_ids?.life_plan ? '✓' : '✗'} Life Plan Database
+                  </div>
+                  <div className={config.database_ids?.life_rules ? 'text-green-600' : 'text-red-600'}>
+                    {config.database_ids?.life_rules ? '✓' : '✗'} Life Rules Database
+                  </div>
+                  <div className={config.connection_test ? 'text-green-600' : 'text-red-600'}>
+                    {config.connection_test ? '✓' : '✗'} 接続テスト
+                  </div>
+                </div>
+              </div>
+
+                  {config.configured && (
+                <div className="pt-4 border-t border-gray-200">
+                  <button
+                    onClick={syncWithNotion}
+                    disabled={syncing}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Sync className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                    {syncing ? '同期中...' : '手動同期'}
+                  </button>
+                </div>
+              )}
+
+              {!config.configured && (
+                <div className="pt-4 border-t border-gray-200">
+                  <button
+                    onClick={fetchConfig}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                  >
+                    <Sync className="w-4 h-4" />
+                    接続状況を再確認
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
